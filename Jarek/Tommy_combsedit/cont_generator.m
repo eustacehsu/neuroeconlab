@@ -1,9 +1,15 @@
 %%
 
-function matlabbatch=cont_generator(name_array,convec)
-ncont=leng(name_array);
-for i=1:ncont
-matlabbatch{1,1}.spm.stats.con.consess{1,i}.tcon.name = name_array{i} ;%string
-matlabbatch{1,1}.spm.stats.con.consess{1,i}.tcon.convec = convec{i}; % horizontal array
+nameOfConrats = ['con1'; 'con2'; 'con3'];
+
+contrasts = [ -1  1  0  0
+               1  0  0  0
+               1 -1  0  0];
+
+numberOfContrasts = size(contrasts,1);
+
+for i=1:numberOfContrasts
+matlabbatch{1,1}.spm.stats.con.consess{1,i}.tcon.name = nameOfConrats(i,:);%string
+matlabbatch{1,1}.spm.stats.con.consess{1,i}.tcon.convec = contrasts(i,:); % horizontal array
 matlabbatch{1,1}.spm.stats.con.consess{1,i}.tcon.sessrep = 'repl';
 end
