@@ -4,32 +4,37 @@
         j = 1;% id of the regressor which it refers to 
         names{n} = [names(j),'_Residual'];
         onsets{n} = Onset(i(:,j)) + dur; % starts at the end of the corresponding regressor
-        durations{n} = Duration(i(:,j)) - dur; %last the length of the corresponding regressor - dur
+        durations{n} = Duration(i(:,j)) - dur_target; %last the length of the corresponding regressor - dur
 %% eval1
+        n = n+1;
         names{n} = 'evaluation;1'; % name of the regressors
         i(:,n) = (Subject == Subj) & strcmp(Event, 'evaluation_1') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n)); %the n regressor starts in the periods indicated by, namely those correspondin to the right subject right even and member of the current period
-        durations{n} = dur; %the duration of the event, this vector is long as the amount of non-zero elements in Onset        
+        durations{n} = dur_target; %the duration of the event, this vector is long as the amount of non-zero elements in Onset        
 %% eval2
+        n = n+1;
         names{n} = 'evaluation;2';
         i(:,n) = (Subject == Subj) & strcmp(Event, 'evaluation_2') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_target;
 %% eval3
+        n = n+1;
         names{n} = 'evaluation;3';
         i(:,n) = (Subject == Subj) & strcmp(Event, 'evaluation_3') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_target;
 %% eval123
+        n = n+1;
         names{n} = 'evaluation;123'; %guess this means
         i(:,n) = (Subject == Subj) & strcmp(Event, 'evaluation_123') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_target;
 %% (eval1+eval12+eval3)
+        n = n+1;
         names{n} = 'evaluation;1+2+3';
         i_1 = (Subject == Subj) & strcmp(Event, 'evaluation_1') & ...
             ismember(Period, Runs{iRuns});
@@ -39,17 +44,19 @@
             ismember(Period, Runs{iRuns});        
         i(:,n)   = i_1 | i_2 | i_3 ;
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_target;
 %% (eval12+eval3)
-        names{n} = 'evaluation;1+2+3';
+        n = n+1;
+        names{n} = 'evaluation;2+3';
         i_2 = (Subject == Subj) & strcmp(Event, 'evaluation_2') & ...
             ismember(Period, Runs{iRuns});
         i_3 = (Subject == Subj) & strcmp(Event, 'evaluation_3') & ...
             ismember(Period, Runs{iRuns});        
         i(:,n)   = i_2 | i_3 ;
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_target;
 %% (eval_1+eval_2+eval_3+eval_123)
+        n = n+1;
         names{n} = 'evaluation;1+2+3+123';
         i_1   = (Subject == Subj) & strcmp(Event, 'evaluation_1') & ...
             ismember(Period, Runs{iRuns});
@@ -61,33 +68,49 @@
             ismember(Period, Runs{iRuns});        
         i(:,n)   = i_1 | i_2 | i_3 | i_123 ;
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_control;
+%% (eval_1+eval_123)During outcome models
+        n = n+1;
+        names{n} = 'evaluation;3+123';
+        i_1   = (Subject == Subj) & strcmp(Event, 'evaluation_1') & ...
+            ismember(Period, Runs{iRuns});
+        i_123 = (Subject == Subj) & strcmp(Event, 'evaluation_123') & ...
+            ismember(Period, Runs{iRuns});        
+        i(:,n)   = i_1 | i_123 ;
+        onsets{n} = Onset(i(:,n));
+        durations{n} = dur_control;
+        
 %% decision based components
 %% decision1
+        n = n+1;
         names{n} = 'decision;1'; % name of the regressors
         i(:,n) = (Subject == Subj) & strcmp(Event, 'decision_1') & ... %%index corresponding to subject subj event decision_1 periods 1:24
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n)); %the n regressor starts in the periods indicated by, namely those correspondin to the right subject right even and member of the current period
         durations{n} = dur; %the duration of the event, this vector is long as the amount of non-zero elements in Onset        
 %% decision2
+        n = n+1;
         names{n} = 'decision;2';
         i(:,n) = (Subject == Subj) & strcmp(Event, 'decision_2') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
         durations{n} = dur;
 %% decision3
+        n = n+1;
         names{n} = 'decision;3';
         i(:,n) = (Subject == Subj) & strcmp(Event, 'decision_3') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
         durations{n} = dur;
 %% decision123
+        n = n+1;
         names{n} = 'decision;123'; %guess this means
         i(:,n) = (Subject == Subj) & strcmp(Event, 'decision_123') & ...
             ismember(Period, Runs{iRuns});
         onsets{n} = Onset(i(:,n));
         durations{n} = dur;
 %% (decision1+decision12+decision3)
+        n = n+1;
         names{n} = 'decision;1+2+3';
         i_1 = (Subject == Subj) & strcmp(Event, 'decision_1') & ...
             ismember(Period, Runs{iRuns});
@@ -99,6 +122,7 @@
         onsets{n} = Onset(i(:,n));
         durations{n} = dur;
 %% (decision12+decision3)
+        n = n+1;
         names{n} = 'decision;1+2+3';
         i_2 = (Subject == Subj) & strcmp(Event, 'decision_2') & ...
             ismember(Period, Runs{iRuns});
@@ -108,6 +132,7 @@
         onsets{n} = Onset(i(:,n));
         durations{n} = dur;
 %% (decision_1+decision_2+decision_3+decision_123)
+        n = n+1;
         names{n} = 'decision;1+2+3+123';
         i_1   = (Subject == Subj) & strcmp(Event, 'decision_1') & ...
             ismember(Period, Runs{iRuns});
@@ -119,9 +144,21 @@
             ismember(Period, Runs{iRuns});        
         i(:,n)   = i_1 | i_2 | i_3 | i_123 ;
         onsets{n} = Onset(i(:,n));
-        durations{n} = dur;
+        durations{n} = dur_control;
 %% Outcomes component
-%% (outcome1+outcome2+outcome_3+outcome_123)=(eval2+eval3+outcome_3+outcome_123)
+%% (outcome_3+outcome_123) during eval models
+        n = n+1;
+        names{n} = 'outcome;3+123';
+        i_3   = (Subject == Subj) & strcmp(Event, 'outcome_3') & ...
+            ismember(Period, Runs{iRuns});      
+        i_123 = (Subject == Subj) & strcmp(Event, 'outcome_123') & ...
+            ismember(Period, Runs{iRuns});        
+        i(:,n)   = i_3 | i_123 ;
+        onsets{n} = Onset(i(:,n));
+        durations{n} = dur_control;
+
+%% (outcome1+outcome2+outcome_3+outcome_123)=(eval2+eval3+outcome_3+outcome_123) during decisions models
+        n = n+1;
         names{n} = 'outcome;1+2+3+123';
         i_1   = (Subject == Subj) & strcmp(Event, 'evaluation_2') & ...
             ismember(Period, Runs{iRuns});
@@ -136,6 +173,7 @@
         durations{n} = dur;
 
  %% economic model components
+ 
  %% (GAIN-LOSS) variable
         pmod(n).name{1} = 'Up-Down'; 
         pmod(n).param{1} = Up(i(:,n))+Down(i(:,n));
