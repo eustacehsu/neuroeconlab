@@ -1,4 +1,4 @@
-function ffx_jobmaker(statdir,datadir,name_array,convec)
+function ffx_jobmaker(statdir,datadir,name_array,convec,Subj)
 % Load template
 %--------------------------------------------------------------------------
 load('template_stat_FFX');
@@ -6,7 +6,7 @@ statdir   = fullfile(statdir, 'FFX');
 
 % Make jobs
 %--------------------------------------------------------------------------
-for cSubj = Subj
+cSubj = Subj
     dSPM  = fullfile(statdir, sprintf('Subject%02d', cSubj), 'SPM');
     dLog  = fullfile(statdir, sprintf('Subject%02d', cSubj), 'LOG');
     dRun1 = fullfile(datadir, sprintf('Subject%02d', cSubj), 'Functional', 'Run1');
@@ -52,4 +52,4 @@ for cSubj = Subj
     %--------------------------------------------------------------------------
     spm('defaults', 'FMRI');
     spm_jobman('run', matlabbatch);
-end
+% end

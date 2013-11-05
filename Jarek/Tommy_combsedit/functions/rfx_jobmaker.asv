@@ -4,14 +4,14 @@ function rfx_jobmaker(name_array,statdir)
 ncont=length(name_array);
 
 for i=1:ncont
-contrast=['con_000',num2str(i)];%name_array{i};
+contrast=name_array{i};
 % Load template
 %--------------------------------------------------------------------------
 load('template_stat_RFX_OnseSampleTtest');
 
 % Make jobs
 %--------------------------------------------------------------------------
-dSPM  = fullfile(statdir, 'RFX', name_array{i});
+dSPM  = fullfile(statdir, 'RFX', contrast);
 dFX   = fullfile(statdir, 'FFX');
 
 % Create SPM directory if it doesn't exist
@@ -24,7 +24,7 @@ fCon = spm_select('FPListRec', dFX, sprintf('^%s.*\\.img$', contrast));
 
 matlabbatch{1}.spm.stats.factorial_design.dir{1} = dSPM;
 matlabbatch{1}.spm.stats.factorial_design.des.t1.scans = cellstr(strcat(fCon, ',1'));
-matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = name_array{i};
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = contrast;
 
 % Save batch
 %--------------------------------------------------------------------------

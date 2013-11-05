@@ -123,6 +123,7 @@ end
 
 rfx_jobmaker(name_array,statdir);
 
+return
 %% Model 2:
 % BOLD = eval1 +(eval12+eval3)+evaluation_123+(decision_1+decision_2+decision_3+decision_123) + (outcome_3+outcome_123)
 % + Residual(1) + Residual(2+3) + Residual(123)  
@@ -131,7 +132,7 @@ statdir = ['A:\DCJ\SPM\stat\tom\',modname];
 mkdir(statdir)
 dur_target=0.5;
 
-for Subj = unique(Subject)'
+for Subj = unique(Subject)
 
     for iRuns = 1:numel(Runs)
 %% log structure definition        
@@ -233,7 +234,7 @@ statdir = ['A:\DCJ\SPM\stat\tom\',modname];
 mkdir(statdir)
 dur_target=0.5;
 
-for Subj = unique(Subject)'
+for Subj = unique(Subject)
 
     for iRuns = 1:numel(Runs)
 %% log structure definition        
@@ -338,7 +339,6 @@ end
 %rfx jobs
 rfx_jobmaker(name_array,statdir);
 
-return
 %% Evaluation Phase Parametric MOdels (a la Giorgio)
  %% (GAIN-LOSS) variable
 %% model1(GAIN-LOSS) variable
