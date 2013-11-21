@@ -1,0 +1,317 @@
+##############################
+#This script is from the Kaye lab at UCSD
+# PSR lme script created 11/1/10 (modified Optibrain LME)
+# Modified by Robin on 02/15/2011 to run LME for TENT output of Sucrose dataset (RBN and CW)
+# Modified: Amanda Bischoff-Grethe 23MAY2011 to run LME for TENT output of
+#     Sucrose dataset for ADOL AN R21 project.  Merged with Colm Connolly's
+#     winlossTies.parallel.psrLme.r script, which allows for parallel processing.
+#     modified by James Melrose to work with Obesity dataset June 2012
+##############################
+rm(list=ls())
+
+library(nlme)
+library(boot)
+library(contrast)
+AFNI_R_DIR="/usr/local/afni"
+verbose=T
+
+##############################
+## use the functions for loading and saving briks from the AFNI
+## distribution as they can cleanly handle floats/doubles
+##############################
+if ( ! is.na(AFNI_R_DIR) ) {
+    source(file.path(AFNI_R_DIR, "AFNIio.R"))
+} else {
+    stop("Couldn't find AFNI_R_DIR in environment. This points to the location from which to load functions for reading and writing AFNI BRIKS. Exiting!")
+}
+
+
+##############################
+# set the number of cpus so we can later break the lme into
+# the same number of chunks and solve each simultaneously
+##############################
+
+ncpus=1
+if ( Sys.info()["sysname"] == "Darwin" ) {
+    Group.results.dir=file.path("/Volumes/Data/studies/relapsefmri/psrAnalysis/data/Group.results")
+    ncpus=as.integer(strsplit(system("sysctl hw.ncpu", intern=T), ' ')[[1]][2])
+    cat(paste("Found" , ncpus, ifelse(ncpus == 1, "cpu", "cpus"), "\n"))
+} else if ( Sys.info()["sysname"] == "Linux" ) {
+    Group.results.dir=file.path("/data/AMPH/Obesity/Group.results")
+    ncpus=as.integer(system("cat /proc/cpuinfo |grep -c processor", intern=T))
+    cat(paste("Found" , ncpus, ifelse(ncpus == 1, "cpu", "cpus"), "\n"))
+} else {
+    cat(paste("Sorry can't determine the number of CPUs in this architecture defaulting to", ncpus, "\n"))
+}
+
+##############################
+#     LME for the Group Main Effect, Sucrose Outcome Main Effect (Sucrose, Water) and their Interaction
+##############################
+
+# this file stores all of the demographics of interest
+# in this analysis, these features include:
+# Column 1: Subject; Column 2: fmriID; Column 3: Group
+# NOTE: subject list in the csv file MUST be in the same order as that in the
+# bucket file, else R doesn't line things up appropriately
+
+Demographicsfile <- paste(Group.results.dir,"ObesitySucroseJuly2012.csv",sep="/")
+demographics<-read.csv(Demographicsfile,header=TRUE)
+
+# Sucrose BRIK
+SucroseBrikFilename=file.path(Group.results.dir, "sucrose.Sucrose.23subj+tlrc.HEAD")
+WaterBrikFilename=file.path(Group.results.dir, "sucrose.Water.23subj+tlrc.HEAD")
+
+# Now read in all the BRIK files
+SucroseBrik=read.AFNI(SucroseBrikFilename, verb=verbose)
+WaterBrik=read.AFNI(WaterBrikFilename, verb=verbose)
+
+# Figure out all the image dimensions
+# dim is the number of parameters from the lme that will be stored as
+# subbriks and exported back for use in AFNI
+dimX=SucroseBrik$dim[1]
+dimY=SucroseBrik$dim[2]
+dimZ=SucroseBrik$dim[3]
+numberOfSubjects=SucroseBrik$dim[4]
+
+# this stored the total number of subbriks for all subjects for all types (suc, wat) and TRs (TR0 thru TR7)
+numberOfBriks=sum(c(SucroseBrik$dim[4], WaterBrik$dim[4]))
+
+# The labels that are attached to the subbriks in the output stats
+# bucket file.  These are dictated by the model formula and should
+# be in the order in which the coefficients from the ANOVA matrix
+# are calculated.
+
+# For this particular model, we will be looking at differences
+# between Group (AN, CW) and Event (suc, wat).
+# Therefore, our breakdowns will be: Intercept, Group, Type,
+# and Group * Type.
+# In other words, our summary table from the ANOVA will be reporting
+# stats on 4 different conditions.  Since ANOVA will return them
+# in column major order (that is, the 4 numDF, then the 4 denDF, etc)
+# we will reorder this for the output bucket file so that everything
+# is grouped into separate subbriks.  Mean baseline for all subjects
+# will be written to the 0 subbrik
+outputStatsBrikLabels= c(
+  "Intercept.numDF", "Intercept.denDF", "Intercept.F-value", "Intercept.p-value",
+  "Group.numDF", "Group.denDF", "Group.F-value", "Group.p-value",
+  "Event.numDF", "Event.denDF", "Event.F-value", "Event.p-value",
+  "Event:Group.numDF", "Event:Group.denDF", "Event:Group.F-value", "Event:Group.p-value",
+  "SucroseVsWater.Contrast", "SucroseVsWater.T-value", "OWvsNW.Contrast", "OWvsNW.T-value",
+  "Sucrose:OWvsNW.Contrast", "Sucrose.OWvsNW.T-value", "Water:OWvsNW.Contrast", "Water:OWvsNW.T-value",
+  "OW:SucroseVsWater.Contrast", "OW:SucroseVsWater.T-value", "NW:SucroseVsWater.Contrast", "NW:SucroseVsWater.T-value"
+  )
+
+# the number of stats subbriks to write out is related to the model
+# formula:
+numberOfStatsBriks=length(outputStatsBrikLabels)
+
+# This function does our lme stuff
+runLme = function (inData, inZ, inNumberOfStatsBriks, inModel, inModelFormula, inRandomFormula) {
+  outStats <- vector(mode="numeric", length=inNumberOfStatsBriks)
+  ##cat (inData, "\n")
+    tag <- 0
+  if ( ! all(inData == 0 ) ) {
+   
+    ## if inData is all zero then we are in a portion of the masked
+    ## out data and should therefore not perform the lme on it just
+    ## return a vector of zeros, if it's not then we get in this
+    ## branch and can try the lme
+   
+    inModel$fmri<-inData
+   
+    ## If lme throws an exception it returns an object, assigned to
+    ## mylme, which inherits from the class try-error. If mylme
+    ## inherits from this class an error was generated by a particular
+    ## voxel. It will default to having its corresponding voxels in
+    ## the outStats array set to 0.
+   
+        if( inherits(mylme <- try(lme(inModelFormula, random=inRandomFormula, data = inModel),
+                              silent=FALSE),
+                 "try-error") ) {
+            temp <- 0
+            tag <- 0
+            cat (paste("Error on slice", inZ, "\n"))
+        } else {
+            temp <- as.vector(unlist(anova(mylme)))
+            tag <- 1
+        }
+    ## anova(mylme) (well summary.aov)  produces a table like the following:
+##             numDF denDF  F-value p-value
+## (Intercept)     1    20 0.353094  0.5590
+## Group           1    20 8.103084  0.0100
+## Type            1    20 5.219311  0.0334
+## Group:Type      1    20 0.000251  0.9875
+
+    ## when this is unlisted, it is unlisted in column major
+    ## order, that is the 4 numDF are first followed by the 4
+    ## denDF and so on. the vector c(1,5,...) simply reorders this
+    ## to be numDF1, denDF1, F-value1, p-value1, and so on. The
+    ## upshot of this is that when we srite this out as a bucket
+    ## file the numDF1, denDF1, F-value1, p-value1, etc are stored
+    ## in seperate subbriks. The mean baseline for all subjects
+    ## will be written in the 0th subbrik.)
+
+    if(length(temp) > 1) {
+      outStats[1:16] = temp[c(1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16)]
+         cat(paste("Processing contrasts \n"))
+
+        ##CONTRASTS
+            if (tag == 1) {
+                #Contrast: Type -- Sucrose vs Water
+                con1 <- try(contrast(mylme, a = list(Type = "Sucrose", Group = levels(inModel$Group)), b = list(Type = "Water", Group = levels(inModel$Group)), type="average"))
+                if(length(con1) > 1) {outStats[17:18] <- c(con1$Contrast, con1$testStat)}
+
+                #Group: OW vs NW
+                con2 <- try(contrast(mylme, a = list(Type = levels(inModel$Type), Group = "OW"), b = list(Type = levels(inModel$Type), Group = "NW"), type="average"))
+                if(length(con2) > 1) {outStats[19:20] <- c(con2$Contrast, con2$testStat)}
+           
+                 #Interaction:Group x Type
+                con3 <- try(contrast(mylme, a = list(Type = "Sucrose", Group = "NW"), b = list(Type = "Sucrose", Group = "OW"), type="average"))
+                if(length(con3) > 1) {outStats[21:22] <- c(con3$Contrast, con3$testStat)}
+             con4 <- try(contrast(mylme, a = list(Type = "Water", Group = "NW"), b = list(Type = "Water", Group = "OW"), type="average"))
+             if(length(con4) > 1) {outStats[23:24] <- c(con4$Contrast, con4$testStat)}
+                con5 <- try(contrast(mylme, a = list(Type = "Sucrose", Group = "OW"), b = list(Type = "Water", Group = "OW"), type="average"))
+                if(length(con5) > 1) {outStats[25:26] <- c(con5$Contrast, con5$testStat)}
+                con6 <- try(contrast(mylme, a = list(Type = "Sucrose", Group = "NW"), b = list(Type = "Water", Group = "NW"), type="average"))
+                 if(length(con6) > 1) {outStats[27:28] <- c(con6$Contrast, con6$testStat)}
+                }
+
+         } else {
+           cat("Got all zeros :-(\n")
+        }
+    } #if ! all(inData == 0 )
+
+    return(outStats)
+}
+
+## enable debugging of runLme
+##debug(runLme)
+
+mrData = c(SucroseBrik$brk, WaterBrik$brk)
+dim(mrData) = c(dimX, dimY, dimZ, numberOfBriks)
+
+# now we will multiply our BRIKs by the mask so that only the voxels within the mask
+# are included in the lme computation.  The runlme function has the actual check to see if
+# a voxel is in the mask or nor...
+# mrData = array(apply(mrData, 4, function (x) x * maskBrik$brk[,,,1]), dim=c(dimX, dimY, dimZ, numberOfBriks))
+
+subject=as.vector(demographics$Subject)
+group=as.vector(demographics$Group)
+
+#### CONFIRM THIS IS CORRECT ####
+model = data.frame(
+  "Subject" = as.vector(subject),
+  "Group"   = as.vector(group),
+  "Type"    = as.vector(
+    cbind(rep("Sucrose", length(subject)),
+          rep("Water", length(subject))))
+  )
+
+modelFormula = as.formula("fmri ~ Group * Type")
+randomFormula = as.formula("random = ~ 1 | Subject")
+
+Stats = array(0, c(dimX, dimY, dimZ, numberOfStatsBriks))
+
+# stop("Stopping")
+
+
+cat(paste("Starting at", date(), "\n"))
+startTime=proc.time()
+ncpus<- 6
+if (ncpus > 1 ) {
+  ## multiple cpus
+  library(snow)
+ 
+  cluster = makeCluster(ncpus, type = "SOCK")
+  clusterEvalQ(cluster, library(nlme))
+  clusterEvalQ(cluster, library(contrast))
+  ## may need to add contrasts here later
+  for ( kk in 1:dimZ ) {
+    cat(paste("Processing Z slice", kk, "started at" , date(), "\n"))
+    Stats[ , , kk, ] = aperm(parApply(cluster, mrData[ , , kk, ],  c(1, 2), runLme, inZ = kk, inNumberOfStatsBriks=numberOfStatsBriks, inModel=model, inModelFormula=modelFormula, inRandomFormula=randomFormula), c(2, 3, 1))
+  }
+  stopCluster(cluster)
+} else {
+  for ( kk in 1:dimZ ) {
+    cat(paste("Processing Z slice", kk, "started at" , date(), "\n"))
+    Stats[ , , kk, ] = aperm(apply(mrData[ , , kk, ],  c(1, 2), runLme, inZ = kk, inNumberOfStatsBriks=numberOfStatsBriks, inModel=model, inModelFormula=modelFormula, inRandomFormula=randomFormula), c(2, 3, 1))
+  }
+} ## single cpu
+cat(paste("Ended at", date(), "\n"))
+cat("Time consumed\n")
+print(proc.time() - startTime)
+
+##stop()
+lmeFile= paste("sucroseBucket.ConditionxGroup.LME.", format(Sys.time(), "%Y%m%d-%H%M%Z"), "+orig", sep="")
+lmeOutBrikFilename=file.path(Group.results.dir, lmeFile)
+hostname=system('hostname', intern=T)
+user=Sys.getenv("USER")
+write.AFNI(lmeOutBrikFilename,
+           Stats, verb=verbose,
+           ##label = baseBrik$head$DATASET_NAME,
+           label=outputStatsBrikLabels,
+           note = paste(paste("[", user, "@", hostname, ": ",  date(), "]", sep=""), file.path(getwd(), "Obesity.GroupSucrose.HRF.LME.R")),
+           origin = SucroseBrik$origin,
+           delta = SucroseBrik$delta,
+           orient= SucroseBrik$orient)
+
+## if we got this far we should be able to run a single voxel to work
+## out the DOF for the various stats, so here goes hopefully it will
+## be outside the mask
+i = 30
+j = 30
+k = 30
+model$fmri = mrData[i, j, k, ]
+if( inherits(mylme <- try(lme(modelFormula, random=randomFormula, data = model),
+                          silent=FALSE),
+             "try-error") ) {
+  temp <- 0
+} else {
+  temp <- as.vector(unlist(anova(mylme)))
+}
+
+  ##CONTRASTS
+  contrDF <- vector(mode="numeric", length=6)
+
+  # Sucrose vs Water
+  contrDF[1] <- contrast(mylme, a = list(Type = "Sucrose", Group = levels(model$Group)), b = list(Type = "Water", Group = levels(model$Group)), type="average")$df
+
+  # AN vs CW
+  contrDF[2] <- contrast(mylme, a = list(Type = levels(model$Type), Group = "NW"), b = list(Type = levels(model$Type), Group = "OW"), type="average")$df
+
+  #Interaction:Group x Type
+  contrDF[3] <- contrast(mylme, a = list(Type = "Sucrose", Group = "NW"), b = list(Type = "Sucrose", Group = "OW"), type="average")$df
+  contrDF[4] <- contrast(mylme, a = list(Type = "Water", Group = "NW"), b = list(Type = "Water", Group = "OW"), type="average")$df
+   contrDF[5] <- contrast(mylme, a = list(Type = "Sucrose", Group = "OW"), b = list(Type = "Water", Group = "OW"), type="average")$df
+  contrDF[6] <- contrast(mylme, a = list(Type = "Sucrose", Group = "NW"), b = list(Type = "Water", Group = "NW"), type="average")$df
+
+statpar = "3drefit"
+
+## we assume here that all voxels have the same DOF. AFNI numbers
+## subbriks from 0 so be sure to subtract 1 when counting them from 1
+if ( is.vector(temp) ) {
+  ## 3 is the subbrik ID of the Intercept.F-value
+  statpar = paste(statpar, "-substatpar 2 fift", temp[1], temp[5])
+  ## 7 is the subbrik ID of the Group.F-value
+  statpar = paste(statpar, "-substatpar 6 fift", temp[2], temp[6])
+  ## 11 is the subbrik ID of the Event.F-value
+  statpar = paste(statpar, "-substatpar 10 fift", temp[3], temp[7])
+  ## 15 is the subbrik ID of the Group:Event.F-value
+  statpar = paste(statpar, "-substatpar 14 fift", temp[4], temp[8])
+  ## 34 is the subbrik ID of the SucrosevsWater.T-value
+  statpar = paste(statpar, "-substatpar 17 fitt", contrDF[1])
+  ## 36 is the subbrik ID of the OwvsNW.T-value
+  statpar = paste(statpar, "-substatpar 19 fitt", contrDF[2])
+  ## 38 is the subbrik ID of the sucrose:OWvsNW.T-value
+  statpar = paste(statpar, "-substatpar 21 fitt", contrDF[3])
+  ## 40 is the subbrik ID of the Water:OWvsNW.T-value
+  statpar = paste(statpar, "-substatpar 23 fitt", contrDF[4])
+  ## 42 is the subbrik ID of the OW:SucrosevsWater.T-value
+  statpar = paste(statpar, "-substatpar 25 fitt", contrDF[5])
+  ## 44 is the subbrik ID of the NW:SucrosevsWater.T-value
+  statpar = paste(statpar, "-substatpar 27 fitt", contrDF[6])
+
+}
+statpar = paste("(cd",  Group.results.dir, ";", statpar, " -view tlrc -space TLRC -addFDR -newid ", lmeFile, ")")
+cat(statpar, "\n")
+system(statpar)
