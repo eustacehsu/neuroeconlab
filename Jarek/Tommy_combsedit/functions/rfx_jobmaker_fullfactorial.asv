@@ -1,0 +1,45 @@
+
+
+
+
+
+
+% %--------------------------------------------------------------------------
+% load('template_stat_RFX_OnseSampleTtest');
+
+% Make jobs
+%--------------------------------------------------------------------------
+dSPM  = fullfile(statdir, 'RFX','FFactorial', name_array{i});
+dFX   = fullfile(statdir, 'FFX');
+
+% Create SPM directory if it doesn't exist
+if ~exist(dSPM, 'dir')
+    mkdir(dSPM);
+end
+%%
+
+matlabbatch{1}.spm.stats.factorial_design.dir{1} = dSPM;
+matlabbatch{1}.spm.stats.factorial_design.des.t1.scans = cellstr(strcat(fCon, ',1'));
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = name_array{i};
+
+
+
+
+matlabbatch{1}.spm.stats.factorial_design.dir = dSPM; % folder where to save
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).name ='FFactorial'; %name of the Factor
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).levels = ncont;  %number of contrasts
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).dept = ??1; %dependence check whether its supposed to be 0 or 1
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).variance = 1; % different or equal variance?
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).gmsca = 0; 
+matlabbatch{1}.spm.stats.factorial_design.des.fd.fact(1).ancova = 0;
+
+
+%% cells definition need one for each contrast I guess
+for i=1:ncont
+    
+contrast=['con_000',num2str(i)];%name_array{i};
+fCon = spm_select('FPListRec', dFX, sprintf('^%s.*\\.img$', contrast)); % Read Con files
+
+
+matlabbatch{1}.spm.stats.factorial_design.des.fd.icell(1).levels = [1 i]; % why are there two ones???   ->> one for the factors and one for the levels the first element is the factor and the second is the level (guess)
+matlabbatch{1}.spm.stats.factorial_design.des.fd.icell(1).scans = fCon;

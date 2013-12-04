@@ -1,8 +1,14 @@
-function ffx_jobmaker(statdir,datadir,name_array,convec,Subj)
+function ffx_jobmaker_2groups(statdir,datadir,name_array,convec,Subj,group1)
 % Load template
 %--------------------------------------------------------------------------
 load('template_stat_FFX');
-statdir   = fullfile(statdir, 'FFX');
+if ~isempty(find(group1==Subj, 1))
+
+    statdir   = fullfile(statdir, 'FFX','group1');
+else
+    statdir   = fullfile(statdir, 'FFX','group2');
+end
+
 
 % Make jobs
 %--------------------------------------------------------------------------

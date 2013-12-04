@@ -1,5 +1,32 @@
 %% definition of each regressor to compose giorgio models
 %dur defines the length of the period of interest
+%% Outcomes condtional on winning
+%outcome of the first choice
+i_1 = (Subject == Subj) & strcmp(Event, 'evaluation_2') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout1 == 1;
+% outcome of the second choice        
+i_2 = (Subject == Subj) & strcmp(Event, 'evaluation_3') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout2 == 1;
+% outcome of the third choice        
+i_3 = (Subject == Subj) & strcmp(Event, 'outcome_3') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout3 == 1;
+% outcome of the three choices        
+i_3 = (Subject == Subj) & strcmp(Event, 'outcome_123') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout??? == 1; %which is the right one for the 123 condition probably all three
+%% Outcomes condtional on loosing
+%outcome of the first choice
+i_1 = (Subject == Subj) & strcmp(Event, 'evaluation_2') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout1 == 0;
+% outcome of the second choice        
+i_2 = (Subject == Subj) & strcmp(Event, 'evaluation_3') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout2 == 0;
+% outcome of the third choice        
+i_3 = (Subject == Subj) & strcmp(Event, 'outcome_3') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout3 == 0;
+% outcome of the three choices        
+i_3 = (Subject == Subj) & strcmp(Event, 'outcome_123') & ... %%index corresponding to subject subj event evaluation_1 periods 1:24
+            ismember(Period, Runs{iRuns}) & winout??? == 0; %which is the right one for the 123 condition probably all three                     
+        
 %% residual
         j = 1;% id of the regressor which it refers to 
         names{n} = [names(j),'_Residual'];
@@ -214,4 +241,12 @@
   pmod(n).name{1} = '(Up-Down)*invest'; 
         pmod(n).param{1} = Up(i(:,n))+Down(i(:,n))*bet3(i(:,n)); %where invest(i) comes from the previous block
         pmod(n).poly{1} = 1; 
+ %%  Investment*(GAIN-LOSS) Variable for 1+2+3
+  pmod(n).name{1} = '(Up-Down)*invest'; 
+        pmod(n).param{1} = Up(i(:,n))+Down(i(:,n))*(bet1(i_1)+bet1(i_2)+bet1(i_3)); %where invest(i) comes from the previous block
+        pmod(n).poly{1} = 1; 
+%%  Investment*(GAIN-LOSS) Variable for 1+2+3
+  pmod(n).name{1} = '(Up-Down)*invest'; 
+        pmod(n).param{1} = Up(i(:,n))+Down(i(:,n))*(bet1(i_2)+bet1(i_3)); %where invest(i) comes from the previous block
+        pmod(n).poly{1} = 1;        
 

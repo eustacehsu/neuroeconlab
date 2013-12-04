@@ -4,6 +4,7 @@ function rfx_jobmaker(name_array,statdir)
 ncont=length(name_array);
 
 for i=1:ncont
+%% OneSampleTtest    
 contrast=['con_000',num2str(i)];%name_array{i};
 % Load template
 %--------------------------------------------------------------------------
@@ -11,7 +12,7 @@ load('template_stat_RFX_OnseSampleTtest');
 
 % Make jobs
 %--------------------------------------------------------------------------
-dSPM  = fullfile(statdir, 'RFX', name_array{i});
+dSPM  = fullfile(statdir, 'RFX','Ttest', name_array{i});
 dFX   = fullfile(statdir, 'FFX');
 
 % Create SPM directory if it doesn't exist
@@ -35,4 +36,38 @@ save(fbs', 'matlabbatch');
 %--------------------------------------------------------------------------
 spm('defaults', 'FMRI');
 spm_jobman('run', matlabbatch);
+% clear matlabbatch
+% %% Anova
+% contrast=['con_000',num2str(i)];%name_array{i};
+% % Load template
+% %--------------------------------------------------------------------------
+% load('template_stat_RFX_Anova');
+% 
+% % Make jobs
+% %--------------------------------------------------------------------------
+% dSPM  = fullfile(statdir, 'RFX','Anova', name_array{i});
+% dFX   = fullfile(statdir, 'FFX');
+% 
+% % Create SPM directory if it doesn't exist
+% if ~exist(dSPM, 'dir')
+%     mkdir(dSPM);
+% end
+% %%
+% % Read Con files
+% fCon = spm_select('FPListRec', dFX, sprintf('^%s.*\\.img$', contrast));
+% 
+% matlabbatch{1}.spm.stats.factorial_design.dir{1} = dSPM;
+% matlabbatch{1}.spm.stats.factorial_design.des.t1.scans = cellstr(strcat(fCon, ',1'));
+% matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = name_array{i};
+% 
+% % Save batch
+% %--------------------------------------------------------------------------
+% fbs = fullfile(dSPM, 'batch_RFX');
+% save(fbs', 'matlabbatch');
+% 
+% % Launch batch
+% %--------------------------------------------------------------------------
+% spm('defaults', 'FMRI');
+% spm_jobman('run', matlabbatch);
+
 end
